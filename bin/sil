@@ -1,0 +1,6 @@
+#!/usr/bin/env bash
+# Launcher for the secret input layer CLI.
+set -euo pipefail
+HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+export PYTHONPATH="$HERE${PYTHONPATH:+:$PYTHONPATH}"
+exec "${SIL_PYTHON:-python3}" -m sil.cli "$@"

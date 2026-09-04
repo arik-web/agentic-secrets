@@ -1,0 +1,9 @@
+{
+  "mcpServers": {
+    "secret-input-layer": {
+      "command": "python3",
+      "args": ["-m", "sil.mcp_server"],
+      "env": { "PYTHONPATH": "${CLAUDE_PLUGIN_ROOT:-.}" }
+    }
+  }
+}

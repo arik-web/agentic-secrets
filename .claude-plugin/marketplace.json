@@ -1,0 +1,11 @@
+{
+  "name": "secret-input-layer",
+  "owner": { "name": "arik" },
+  "plugins": [
+    {
+      "name": "secret-input-layer",
+      "source": "./",
+      "description": "Local secret broker: agents request, you paste in a floating window, the value stays in the Keychain."
+    }
+  ]
+}

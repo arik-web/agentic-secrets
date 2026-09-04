@@ -1,0 +1,7 @@
+{
+  "name": "secret-input-layer",
+  "description": "Ask the human for a secret through a local paste window. The value goes to the macOS Keychain and never appears in the transcript.",
+  "version": "0.4.0",
+  "author": { "name": "arik" },
+  "keywords": ["secrets", "keychain", "credentials", "mcp"]
+}
