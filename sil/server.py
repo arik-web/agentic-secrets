@@ -145,7 +145,8 @@ class Handler(BaseHTTPRequestHandler):
         if method == "GET":
             request = api.registry.by_token(token)
             self._html(200, pages.paste_form({**request.public(),
-                                              "token": token}))
+                                              "token": token},
+                                             store.backend_label()))
             return True
         if method == "POST":
             form = self._form()

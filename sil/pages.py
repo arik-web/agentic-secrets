@@ -93,8 +93,12 @@ def _field_input(index: int, field: dict) -> str:
             f'<span class="as">{stored_as}</span></label>{box}{hint_markup}</div>')
 
 
-def paste_form(request: dict) -> str:
-    """Return the form a human fills in to hand over one or more secrets."""
+def paste_form(request: dict, backend: str) -> str:
+    """Return the form a human fills in to hand over one or more secrets.
+
+    `backend` is the human-readable store name from `store.backend_label()`,
+    passed in rather than imported so this module stays presentational.
+    """
     rows = "".join([
         _row("needed for", request["purpose"]),
         _row("goes to", request["target"]),
@@ -122,7 +126,7 @@ def paste_form(request: dict) -> str:
           </button>
         </div>
       </form>
-      <p class="note">Stored in your macOS Keychain. Close this tab when done.</p>
+      <p class="note">Stored in {html.escape(backend)}. Close this tab when done.</p>
       <script>
         const reveal = document.getElementById('reveal');
         const boxes = document.querySelectorAll('.masked');

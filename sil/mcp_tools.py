@@ -13,8 +13,9 @@ TOOLS = [
         "title": "Ask the human for a secret",
         "description": (
             "Open a local browser form so the human can paste a secret "
-            "(API key, password, token). The value is stored in the macOS "
-            "Keychain and is NEVER returned to you. Blocks until the human "
+            "(API key, password, token). The value is stored in the operating "
+            "system's keystore - Keychain, Secret Service or Credential "
+            "Manager - and is NEVER returned to you. Blocks until the human "
             "answers or `wait` seconds pass. Use this instead of asking for a "
             "secret in chat."),
         "inputSchema": {

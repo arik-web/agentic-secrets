@@ -8,7 +8,7 @@ import urllib.error
 import urllib.parse
 import urllib.request
 
-from support import cleanup, isolate
+from support import cleanup, isolate, python_command
 
 HOME = isolate()
 
@@ -187,14 +187,17 @@ class Usage(unittest.TestCase):
         self.assertEqual(self.client.describe("demo.key")["length"], 13)
 
     def test_run_returns_scrubbed_output(self):
-        result = self.client.run(command=["/bin/sh", "-c", "echo $K"],
-                                 env={"K": "demo.key"})
+        result = self.client.run(
+            command=python_command('import os; print(os.environ["K"])'),
+            env={"K": "demo.key"})
         self.assertNotIn("sk-live-usage", result["stdout"])
         self.assertEqual(result["exit_code"], 0)
 
     def test_run_supports_shell_strings(self):
-        result = self.client.run(command="test -n \"$K\" && echo present",
-                                 env={"K": "demo.key"}, shell=True)
+        script = ("if defined K echo present" if os.name == "nt"
+                  else 'test -n "$K" && echo present')
+        result = self.client.run(command=script, env={"K": "demo.key"},
+                                 shell=True)
         self.assertIn("present", result["stdout"])
 
     def test_materialize_writes_the_file_but_returns_metadata_only(self):
@@ -399,7 +402,8 @@ class MultiField(unittest.TestCase):
         post_form(opened["url"], {"action": "save", "field.api_key": "KEY-aaaa",
                                   "field.api_secret": "SECRET-bbbb"})
         result = self.client.run(
-            command=["/bin/sh", "-c", "echo $K; echo $S"],
+            command=python_command('import os; print(os.environ["K"]);'
+                                   ' print(os.environ["S"])'),
             env={"K": "kraken.api_key", "S": "kraken.api_secret"})
         self.assertNotIn("KEY-aaaa", result["stdout"])
         self.assertNotIn("SECRET-bbbb", result["stdout"])

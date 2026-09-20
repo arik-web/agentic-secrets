@@ -1,4 +1,4 @@
-"""Secret persistence: Keychain when available, private files otherwise.
+"""Secret persistence: the operating system's keystore, private files otherwise.
 
 Values only ever leave this module through `get`. Everything else in the
 package works from the metadata index, which never contains a secret value.
@@ -14,7 +14,7 @@ import threading
 import time
 from pathlib import Path
 
-from . import config, keychain
+from . import config, keychain, secretservice, wincred
 from .errors import NotFoundError, StorageError, ValidationError
 from .names import validate_secret_name
 
@@ -37,8 +37,12 @@ def _service_for(name: str) -> str:
 
 
 def _account() -> str:
-    """Return the keychain account string; one per local user."""
-    return os.environ.get("USER", "sil")
+    """Return the keystore account string; one per local user.
+
+    POSIX exports USER, Windows exports USERNAME; neither is guaranteed, so
+    there is a constant to fall back on.
+    """
+    return os.environ.get("USER") or os.environ.get("USERNAME") or "sil"
 
 
 def _write_private(path: Path, text: str) -> None:
@@ -100,17 +104,62 @@ def _write_index(index: dict) -> None:
     _write_private(INDEX_FILE, json.dumps(index, indent=2, sort_keys=True))
 
 
-def backend_name() -> str:
-    """Return the active storage backend identifier.
+# One native keystore per operating system. Each module's is_available()
+# checks sys.platform first, so at most one of these can ever answer True and
+# the order is documentation rather than precedence.
+NATIVE_BACKENDS = (
+    ("keychain", keychain),            # macOS   - Security.framework
+    ("secretservice", secretservice),  # Linux   - libsecret / org.freedesktop.secrets
+    ("wincred", wincred),              # Windows - Credential Manager
+)
+
+
+def _native():
+    """Return (name, module) for this host's keystore, or (None, None).
 
     SIL_FORCE_FILE_BACKEND=1 pins the private-file backend; tests and hosts
-    without a Keychain use it.
+    with no keystore at all use it. SIL_BACKEND names one explicitly, which is
+    how a Linux box with a broken session bus is told to stop trying.
     """
     if os.environ.get("SIL_FORCE_FILE_BACKEND") == "1":
-        return "file"
-    if keychain.is_available():
-        return "keychain"
-    return "file"
+        return None, None
+    forced = os.environ.get("SIL_BACKEND")
+    if forced:
+        if forced == "file":
+            return None, None
+        for name, module in NATIVE_BACKENDS:
+            if name == forced:
+                if not module.is_available():
+                    raise StorageError(
+                        f"SIL_BACKEND={forced} is not available on this host")
+                return name, module
+        raise StorageError(f"SIL_BACKEND={forced} is not a known backend")
+    for name, module in NATIVE_BACKENDS:
+        if module.is_available():
+            return name, module
+    return None, None
+
+
+def backend_name() -> str:
+    """Return the active storage backend identifier."""
+    name, _ = _native()
+    return name or "file"
+
+
+# Shown to the human on the paste page and to the agent in the tool
+# description, so it says where the value actually lands on THIS host rather
+# than naming one platform's keystore everywhere.
+BACKEND_LABELS = {
+    "keychain": "your macOS Keychain",
+    "secretservice": "your system keyring (Secret Service)",
+    "wincred": "Windows Credential Manager",
+    "file": "a private, owner-only file in your home directory",
+}
+
+
+def backend_label() -> str:
+    """Return a human-readable name for the active backend."""
+    return BACKEND_LABELS.get(backend_name(), backend_name())
 
 
 def _fallback_path(name: str) -> Path:
@@ -122,16 +171,18 @@ def _fallback_path(name: str) -> Path:
 
 def _backend_put(name: str, value: str) -> None:
     """Write the value into the active backend."""
-    if backend_name() == "keychain":
-        keychain.set_password(_service_for(name), _account(), value)
+    _, module = _native()
+    if module is not None:
+        module.set_password(_service_for(name), _account(), value)
         return
     _write_private(_fallback_path(name), value)
 
 
 def _backend_get(name: str) -> str:
     """Read the value from the active backend."""
-    if backend_name() == "keychain":
-        return keychain.get_password(_service_for(name), _account())
+    _, module = _native()
+    if module is not None:
+        return module.get_password(_service_for(name), _account())
     path = _fallback_path(name)
     if not path.exists():
         raise NotFoundError(f"no stored value for {name}")
@@ -140,9 +191,10 @@ def _backend_get(name: str) -> str:
 
 def _backend_delete(name: str) -> None:
     """Remove the value from the active backend, ignoring an absent value."""
-    if backend_name() == "keychain":
+    _, module = _native()
+    if module is not None:
         try:
-            keychain.delete_password(_service_for(name), _account())
+            module.delete_password(_service_for(name), _account())
         except NotFoundError:
             pass
         return

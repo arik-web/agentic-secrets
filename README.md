@@ -3,8 +3,9 @@
 Agents need secrets. You do not want to paste secrets into a chat.
 
 This is a local broker. An agent asks for a named secret; a small window opens
-on your screen; you paste the value; it lands in your **macOS Keychain**. The
-agent is told *that it worked* — never *what it is*. Then the agent uses it
+on your screen; you paste the value; it lands in **your operating system's
+keystore** — Keychain on macOS, Secret Service on Linux, Credential Manager on
+Windows. The agent is told *that it worked* — never *what it is*. Then the agent uses it
 without reading it: injected into a command's environment, or rendered into a
 `0600` config file.
 
@@ -100,8 +101,8 @@ textarea; optional boxes may be left blank.
 ## What protects what
 
 - **Values never cross the API.** `get` exists in one module; no route returns it.
-- **Keychain**, through `Security.framework` directly — the value is never a
-  process argument, so it cannot be read out of `ps`.
+- **The OS keystore**, through its C API directly on all three platforms —
+  the value is never a process argument, so it cannot be read out of `ps`.
 - **Loopback only**, plus a bearer token in `~/.secret-input-layer/api-token`
   (`0600`) and a pinned `Host` header, so no web page can reach the broker.
 - **One-shot paste links.** A used or expired link is gone; requests expire in
@@ -140,16 +141,33 @@ scrubbed from output without also mangling ordinary text.
   daemon.log         method + path only, never a body
 ```
 
-Secret values live in the login Keychain under service `sil.<name>`. On a host
-without a Keychain they fall back to `0600` files in
-`~/.secret-input-layer/store/` — the daemon reports which backend is live in
-`sil status`.
+Secret values live in the OS keystore under service `sil.<name>`:
+
+| Platform | Backend | Where it shows up |
+|---|---|---|
+| macOS | `Security.framework` | Keychain Access, login keychain |
+| Linux | `libsecret` / `org.freedesktop.secrets` | Seahorse, KWallet, any Secret Service agent |
+| Windows | `advapi32` Credential Manager | Control Panel → Credential Manager → Windows Credentials |
+
+On a host with no keystore — a headless server, a session with no D-Bus — they
+fall back to `0600` files in `~/.secret-input-layer/store/`. The daemon reports
+which backend is live in `sil status`, and `SIL_BACKEND` pins one explicitly
+(`keychain`, `secretservice`, `wincred`, `file`); naming one that is not
+available on this host is an error rather than a silent fallback.
+
+**Windows size limit.** Credential Manager caps a credential blob at 2560
+bytes — roughly 1280 characters — which is well under the 64 KiB this package
+otherwise allows, and under the size of a typical RSA private key. An oversized
+value is refused with an explanation rather than truncated. macOS and Linux have
+no such limit.
 
 ## Layout
 
 | Path | What |
 |---|---|
-| `sil/keychain.py` | `Security.framework` bindings |
+| `sil/keychain.py` | macOS `Security.framework` bindings |
+| `sil/secretservice.py` | Linux `libsecret` bindings |
+| `sil/wincred.py` | Windows Credential Manager bindings |
 | `sil/store.py` | persistence + metadata index |
 | `sil/pending.py` | outstanding asks, one-shot tokens |
 | `sil/consume.py` | the two ways a value is spent |

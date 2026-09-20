@@ -8,7 +8,7 @@ import unittest
 import urllib.parse
 import urllib.request
 
-from support import cleanup, isolate
+from support import cleanup, isolate, python_command
 
 HOME = isolate()
 
@@ -152,8 +152,10 @@ class Signalling(unittest.TestCase):
         marker = os.path.join(HOME, "notified.txt")
         opened = self.client.request_secret(
             name="sig.four", wait=0,
-            notify={"command": ["/bin/sh", "-c",
-                                f'printf "%s %s" "$SIL_NAME" "$SIL_STATE" > {marker}']})
+            notify={"command": python_command(
+                'import os;'
+                f' open({marker!r}, "w").write('
+                '"%s %s" % (os.environ["SIL_NAME"], os.environ["SIL_STATE"]))')})
         paste_soon(opened["url"], "command-value")
         for _ in range(100):
             if os.path.exists(marker):

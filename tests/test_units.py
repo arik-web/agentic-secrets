@@ -4,7 +4,7 @@ import os
 import stat
 import unittest
 
-from support import cleanup, isolate
+from support import cleanup, isolate, python_command
 
 HOME = isolate()
 
@@ -162,29 +162,32 @@ class Consume(unittest.TestCase):
             store.delete(entry["name"])
 
     def test_run_injects_and_scrubs(self):
-        result = consume.run(["/bin/sh", "-c", "echo $K; echo len=${#K}"],
-                             {"K": "demo.key"})
+        result = consume.run(
+            python_command('import os; v = os.environ["K"];'
+                           ' print(v); print("len=%d" % len(v))'),
+            {"K": "demo.key"})
         self.assertEqual(result["exit_code"], 0)
         self.assertNotIn("sk-live-zzz999", result["stdout"])
         self.assertIn("len=14", result["stdout"])
         self.assertEqual(result["scrubbed"], ["demo.key"])
 
     def test_run_reports_a_non_zero_exit(self):
-        result = consume.run(["/bin/sh", "-c", "exit 3"], {"K": "demo.key"})
+        result = consume.run(python_command("raise SystemExit(3)"),
+                             {"K": "demo.key"})
         self.assertEqual(result["exit_code"], 3)
 
     def test_run_times_out_without_hanging(self):
-        result = consume.run(["/bin/sh", "-c", "sleep 5"], {"K": "demo.key"},
-                             timeout=0.3)
+        result = consume.run(python_command("import time; time.sleep(5)"),
+                             {"K": "demo.key"}, timeout=0.3)
         self.assertTrue(result["timed_out"])
 
     def test_run_rejects_an_unknown_secret(self):
         with self.assertRaises(NotFoundError):
-            consume.run(["/bin/echo", "hi"], {"K": "missing.key"})
+            consume.run(python_command("pass"), {"K": "missing.key"})
 
     def test_run_rejects_a_bad_env_var_name(self):
         with self.assertRaises(ValidationError):
-            consume.run(["/bin/echo", "hi"], {"bad name": "demo.key"})
+            consume.run(python_command("pass"), {"bad name": "demo.key"})
 
     def test_materialize_writes_private_file_with_the_value(self):
         path = os.path.join(HOME, "out.env")
@@ -234,9 +237,11 @@ class Consume(unittest.TestCase):
             consume.materialize(link, "K={{secret:demo.key}}")
 
     def test_long_output_is_redacted_before_it_is_truncated(self):
-        filler = "x" * (consume.MAX_OUTPUT_CHARS - 4)
         result = consume.run(
-            ["/bin/sh", "-c", f'printf "%s" "{filler}"; printf "%s" "$K"'],
+            python_command(
+                'import os, sys;'
+                f' sys.stdout.write("x" * {consume.MAX_OUTPUT_CHARS - 4});'
+                ' sys.stdout.write(os.environ["K"])'),
             {"K": "demo.key"})
         self.assertNotIn("sk-live", result["stdout"])
         self.assertEqual(result["scrubbed"], ["demo.key"])

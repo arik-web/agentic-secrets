@@ -2,11 +2,12 @@
 
 import io
 import json
+import os
 import threading
 import unittest
 from contextlib import redirect_stderr, redirect_stdout
 
-from support import cleanup, isolate
+from support import cleanup, isolate, python_command
 
 HOME = isolate()
 
@@ -58,7 +59,7 @@ class BrowserLaunch(unittest.TestCase):
 
     def test_custom_browser_override_is_used(self):
         self.assertEqual(browser.open_url("http://127.0.0.1:1/x"),
-                         "custom:/usr/bin/true")
+                         "custom:" + os.environ["SIL_BROWSER"])
 
 
 class Cli(unittest.TestCase):
@@ -108,13 +109,15 @@ class Cli(unittest.TestCase):
     def test_run_injects_and_scrubs(self):
         store.put("cli.key", "sk-cli-value")
         code, out, _ = run_cli(["run", "--env", "K=cli.key", "--",
-                                "/bin/sh", "-c", "echo $K"])
+                                *python_command(
+                                    'import os; print(os.environ["K"])')])
         self.assertEqual(code, 0)
         self.assertNotIn("sk-cli-value", out)
 
     def test_run_rejects_a_malformed_env_pair(self):
         with self.assertRaises(SystemExit):
-            run_cli(["run", "--env", "NOEQUALS", "--", "/bin/echo", "hi"])
+            run_cli(["run", "--env", "NOEQUALS", "--",
+                     *python_command("pass")])
 
     def test_write_renders_a_template_file(self):
         store.put("cli.key", "sk-cli-value")
