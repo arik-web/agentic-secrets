@@ -58,6 +58,7 @@ def cmd_request(args) -> int:
     result = Client().request_secret(
         name=args.name, purpose=args.purpose or "", target=args.target or "",
         hint=args.hint or "", requested_by=args.by, overwrite=args.overwrite,
+        task=args.task or "", where_to_find=args.where or "",
         wait=args.wait, open_browser=not args.no_browser,
         notify=notify or None, preset=args.preset,
         fields=args.field or None)
@@ -156,6 +157,8 @@ def build_parser() -> argparse.ArgumentParser:
     ask.add_argument("name")
     ask.add_argument("--purpose", help="why the secret is needed")
     ask.add_argument("--target", help="where it will be used")
+    ask.add_argument("--task", help="what you are building that needs it")
+    ask.add_argument("--where", help="where the human can find the value")
     ask.add_argument("--hint", help="label shown above the input box")
     ask.add_argument("--by", default="an agent", help="who is asking")
     ask.add_argument("--wait", type=float, default=config.DEFAULT_WAIT_SECONDS)

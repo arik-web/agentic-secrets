@@ -20,12 +20,23 @@ TOOLS = [
             "secret in chat."),
         "inputSchema": {
             "type": "object",
-            "required": ["name"],
+            "required": ["name", "purpose", "task"],
             "properties": {
                 "name": {**SECRET_NAME,
                          "description": "stable id, e.g. 'openai.api_key'"},
                 "purpose": {"type": "string",
-                            "description": "why you need it - shown to the human"},
+                            "description": (
+                                "REQUIRED. What this secret is (service + kind) and why you "
+                                "need it now - shown big on the human's window, e.g. 'Binance "
+                                "testnet API key so the venue adapter can place paper orders'")},
+                "task": {"type": "string",
+                         "description": (
+                             "REQUIRED. What you are building or fixing that needs it, e.g. "
+                             "'tcopy 0.396: Binance venue adapter'")},
+                "where_to_find": {"type": "string",
+                                  "description": (
+                                      "where the human gets the value, e.g. 'binance.com > "
+                                      "API Management' or 'VPS /opt/odizma/.env'")},
                 "target": {"type": "string",
                            "description": "where it will be used, e.g. '.env'"},
                 "hint": {"type": "string",

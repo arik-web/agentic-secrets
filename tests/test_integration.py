@@ -106,7 +106,7 @@ class PasteFlow(unittest.TestCase):
 
     def _open_request(self, name="demo.key", **kwargs):
         """Create a non-blocking request and return its public view."""
-        return self.client.request_secret(name=name, wait=0, purpose="testing",
+        return self.client.request_secret(name=name, wait=0, purpose="testing the paste flow",
                                           **kwargs)
 
     def test_request_response_contains_no_value_field(self):
@@ -122,6 +122,41 @@ class PasteFlow(unittest.TestCase):
         self.assertIn("demo.key", page)
         self.assertIn("/tmp/.env", page)
         self.assertIn('type="password"', page)
+
+    def _page(self, opened):
+        status, page = raw("GET", opened["url"].replace(config.base_url(), ""),
+                           headers={"Host": f"{config.HOST}:{config.port()}"})
+        self.assertEqual(status, 200)
+        return page
+
+    def test_form_says_what_the_secret_is_who_asks_and_for_what(self):
+        opened = self._open_request(
+            name="binance.api_key", task="tcopy 0.396: Binance venue adapter",
+            where_to_find="binance.com > API Management",
+            requester={"agent": "fix-binance", "label": "Venue-work",
+                       "session_purpose": "binance adapter", "project": "/w/Tagent/tcopy"})
+        page = self._page(opened)
+        for shown in ("binance.api_key", "secret &middot; binance", "testing the paste flow",
+                      "tcopy 0.396: Binance venue adapter", "binance.com &gt; API Management",
+                      "fix-binance - Venue-work (binance adapter) in /w/Tagent/tcopy"):
+            self.assertIn(shown, page)
+        self.assertEqual(opened["task"], "tcopy 0.396: Binance venue adapter")
+
+    def test_an_unstated_task_is_shown_as_unstated_not_hidden(self):
+        page = self._page(self._open_request(name="quiet.key"))
+        self.assertIn("building", page)
+        self.assertIn("the agent did not say", page)
+
+    def test_a_request_without_a_real_purpose_is_refused(self):
+        for purpose in (None, "", "key"):
+            kwargs = {} if purpose is None else {"purpose": purpose}
+            with self.assertRaises(SilError) as caught:
+                self.client.request_secret(name="vague.key", wait=0, **kwargs)
+            self.assertIn("purpose is required", str(caught.exception))
+
+    def test_the_client_identifies_the_asker_when_the_agent_does_not(self):
+        opened = self._open_request(name="auto.key")
+        self.assertIsInstance(opened["requester"], dict)
 
     def test_paste_stores_the_value_and_settles_the_request(self):
         opened = self._open_request()
@@ -224,7 +259,7 @@ class Usage(unittest.TestCase):
             self.assertEqual(exc.status, 400)
 
     def test_wait_with_a_bad_number_is_a_400_not_a_500(self):
-        opened = self.client.request_secret(name="wait.probe", wait=0)
+        opened = self.client.request_secret(name="wait.probe", purpose="test fixture: exercising the broker", wait=0)
         try:
             self.client.call("POST",
                              f"/api/request/{opened['request_id']}/wait",
@@ -310,6 +345,7 @@ class MultiField(unittest.TestCase):
 
     def _open(self, **kwargs):
         """Open a non-blocking request and return its public view."""
+        kwargs.setdefault("purpose", "test fixture: multi-field request")
         return self.client.request_secret(wait=0, **kwargs)
 
     def test_a_preset_expands_into_named_fields(self):

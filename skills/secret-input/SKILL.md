@@ -15,8 +15,16 @@ one, call the tool. You are told that it worked - never what it is.
 ## Flow
 
 1. `secret_list` - it may already be stored. Reuse it.
-2. `secret_request` with a stable `name` (`openai.api_key`, `pg.prod_url`),
-   a plain-language `purpose`, and the `target` where it will land.
+2. `secret_request` with a stable `name` (`openai.api_key`, `pg.prod_url`) and
+   ALWAYS tell the human what they are looking at - the window shows these big:
+   - `purpose` (**required**, a sentence): what the secret is and why you need it
+     now, e.g. "Binance testnet API key so the venue adapter can place paper orders".
+     A one-word purpose is refused.
+   - `task` (**required**): what you are building or fixing, e.g. "tcopy 0.396:
+     Binance venue adapter".
+   - `where_to_find`: where the human gets the value ("binance.com > API Management").
+   - `target`: where it will land.
+   Your session (name, billboard label, project) is detected and shown automatically.
    A paste window opens on the human's screen; the call blocks until they
    answer or `wait` seconds pass.
 

@@ -16,7 +16,7 @@ CLI, or make an HTTP request to loopback.
 
 ```bash
 ./install.sh          # launchers in ~/.local/bin, wiring for every agent found
-./run-tests.sh        # 79 tests
+./run-tests.sh        # 136 tests
 ```
 
 ## The flow
@@ -30,6 +30,19 @@ agent            broker (127.0.0.1)          you
   |  secret_run(["stripe","balance"], {SK: "stripe.secret_key"})
   |<-- stdout, with the value scrubbed out    |
 ```
+
+## What the window tells you (0.5.0)
+
+Every window says, before you paste anything:
+
+- **which secret** - its name in large type and the service it belongs to;
+- **why** - the agent's `purpose`, which is required (a one-word purpose is refused);
+- **building** - the agent's `task`;
+- **where to get it** - `where_to_find`, when the agent knows;
+- **asked by** - the asking session, detected by walking the process tree to the Claude
+  Code session record plus its billboard label/purpose, not taken from the agent's word.
+
+Anything the agent did not say is printed as "the agent did not say", never left out.
 
 ## Being told when it lands
 

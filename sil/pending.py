@@ -22,7 +22,8 @@ class PendingRequest:
 
     def __init__(self, name: str, purpose: str, hint: str, target: str,
                  requested_by: str, ttl: float, notify: dict | None = None,
-                 fields: list | None = None):
+                 fields: list | None = None, task: str = "", where_to_find: str = "",
+                 requester: dict | None = None):
         self.id = pysecrets.token_hex(8)
         self.token = pysecrets.token_urlsafe(32)
         self.name = name
@@ -30,6 +31,9 @@ class PendingRequest:
         self.hint = hint
         self.target = target
         self.requested_by = requested_by
+        self.task = task
+        self.where_to_find = where_to_find
+        self.requester = requester or {}
         self.notify = notify or {}
         self.fields = fields or []
         self.created_at = time.time()
@@ -59,6 +63,9 @@ class PendingRequest:
             "hint": self.hint,
             "target": self.target,
             "requested_by": self.requested_by,
+            "task": self.task,
+            "where_to_find": self.where_to_find,
+            "requester": dict(self.requester),
             "state": state,
             "detail": self.detail,
             "fingerprint": self.fingerprint,
@@ -84,11 +91,12 @@ class PendingRegistry:
 
     def create(self, *, name: str, purpose: str = "", hint: str = "",
                target: str = "", requested_by: str = "", notify: dict = None,
-               fields: list = None,
+               fields: list = None, task: str = "", where_to_find: str = "",
+               requester: dict | None = None,
                ttl: float = config.REQUEST_TTL_SECONDS) -> PendingRequest:
         """Register and return a new pending request."""
         request = PendingRequest(name, purpose, hint, target, requested_by, ttl,
-                                 notify, fields)
+                                 notify, fields, task, where_to_find, requester)
         with self._lock:
             expired = self._sweep_locked()
             self._by_id[request.id] = request

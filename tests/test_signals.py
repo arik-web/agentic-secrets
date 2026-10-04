@@ -126,7 +126,7 @@ class Signalling(unittest.TestCase):
             store.delete(entry["name"])
 
     def test_a_blocking_request_returns_as_soon_as_it_is_saved(self):
-        opened = self.client.request_secret(name="sig.one", wait=0)
+        opened = self.client.request_secret(name="sig.one", purpose="test fixture: exercising the broker", wait=0)
         paste_soon(opened["url"], "blocking-value")
         started = time.time()
         settled = self.client.wait_for(opened["request_id"], 10)
@@ -135,7 +135,7 @@ class Signalling(unittest.TestCase):
 
     def test_a_second_listener_is_woken_by_the_event_feed(self):
         cursor = self.client.events()["event_cursor"]
-        opened = self.client.request_secret(name="sig.two", wait=0)
+        opened = self.client.request_secret(name="sig.two", purpose="test fixture: exercising the broker", wait=0)
         paste_soon(opened["url"], "event-value")
         found = self.client.events(since=cursor, wait=10)["events"]
         self.assertEqual(found[0]["name"], "sig.two")
@@ -143,7 +143,7 @@ class Signalling(unittest.TestCase):
 
     def test_events_never_carry_the_value(self):
         cursor = self.client.events()["event_cursor"]
-        opened = self.client.request_secret(name="sig.three", wait=0)
+        opened = self.client.request_secret(name="sig.three", purpose="test fixture: exercising the broker", wait=0)
         paste_soon(opened["url"], "leaky-value-here")
         found = self.client.events(since=cursor, wait=10)["events"]
         self.assertNotIn("leaky-value-here", json.dumps(found))
@@ -151,7 +151,7 @@ class Signalling(unittest.TestCase):
     def test_a_notify_command_runs_when_the_human_saves(self):
         marker = os.path.join(HOME, "notified.txt")
         opened = self.client.request_secret(
-            name="sig.four", wait=0,
+            name="sig.four", wait=0, purpose="test fixture: exercising the broker",
             notify={"command": python_command(
                 'import os;'
                 f' open({marker!r}, "w").write('
@@ -165,7 +165,7 @@ class Signalling(unittest.TestCase):
 
     def test_a_declined_request_signals_too(self):
         cursor = self.client.events()["event_cursor"]
-        opened = self.client.request_secret(name="sig.five", wait=0)
+        opened = self.client.request_secret(name="sig.five", purpose="test fixture: exercising the broker", wait=0)
         body = urllib.parse.urlencode({"action": "cancel"}).encode()
         urllib.request.urlopen(urllib.request.Request(
             opened["url"], data=body, method="POST",
@@ -176,7 +176,7 @@ class Signalling(unittest.TestCase):
 
     def test_an_expired_request_signals_too(self):
         cursor = self.client.events()["event_cursor"]
-        self.client.request_secret(name="sig.six", wait=0, ttl=0.5)
+        self.client.request_secret(name="sig.six", purpose="test fixture: exercising the broker", wait=0, ttl=0.5)
         time.sleep(0.7)
         self.client.call("GET", "/api/requests")
         found = self.client.events(since=cursor)["events"]

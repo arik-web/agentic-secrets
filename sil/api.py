@@ -3,9 +3,14 @@
 import time
 
 from . import (__version__, browser, config, consume, events, fields,
-               notify, pending, store)
+               notify, pending, requester, store)
 from .errors import ConflictError, ValidationError
 from .names import clean_label, validate_secret_name
+
+
+# A purpose shorter than this is a word, not a reason ("key", "token") - the exact case that left
+# the human staring at a window not knowing which secret to paste.
+MIN_PURPOSE_LENGTH = 12
 
 
 def _as_float(value, field: str, default: float, maximum: float) -> float:
@@ -81,11 +86,22 @@ class Api:
                            "pass overwrite=true to replace"),
                 "secrets": [store.describe(target) for target in held],
             }
+        purpose = clean_label(payload.get("purpose"), "purpose")
+        if len(purpose) < MIN_PURPOSE_LENGTH:
+            raise ValidationError(
+                "purpose is required: say in a sentence what this secret is for and why you "
+                "need it now (e.g. 'Binance API key so the tcopy venue adapter can place paper "
+                "orders'). Also pass task (what you are building) and, if you know it, "
+                "where_to_find (where the human gets the value). Without these the human "
+                "cannot tell which secret to paste.")
         request = self.registry.create(
             notify=notify.validate(payload.get("notify")),
+            task=clean_label(payload.get("task"), "task"),
+            where_to_find=clean_label(payload.get("where_to_find"), "where_to_find"),
+            requester=requester.clean(payload.get("requester")),
             fields=wanted,
             name=name,
-            purpose=clean_label(payload.get("purpose"), "purpose"),
+            purpose=purpose,
             hint=clean_label(payload.get("hint"), "hint"),
             target=clean_label(payload.get("target"), "target"),
             requested_by=clean_label(payload.get("requested_by"),

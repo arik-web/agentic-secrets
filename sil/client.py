@@ -4,7 +4,7 @@ import json
 import urllib.error
 import urllib.request
 
-from . import auth, config, daemon
+from . import auth, config, daemon, requester
 from .errors import DaemonUnavailableError, SilError
 
 DEFAULT_TIMEOUT = 30.0
@@ -60,6 +60,9 @@ class Client:
     def request_secret(self, **payload) -> dict:
         """Ask the human for a secret."""
         wait = float(payload.get("wait", config.DEFAULT_WAIT_SECONDS))
+        # The human must see WHO is asking even when the agent leaves requested_by out.
+        if not payload.get("requester"):
+            payload = {**payload, "requester": requester.detect()}
         return self.call("POST", "/api/request", payload, timeout=wait + 20)
 
     def request_status(self, request_id: str) -> dict:

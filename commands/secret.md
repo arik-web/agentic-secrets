@@ -7,7 +7,9 @@ allowed-tools: mcp__secret-input-layer__secret_request, mcp__secret-input-layer_
 Request the secret `$1` from the human using `secret_request`.
 
 - `name`: `$1`
-- `purpose`: `$2` (if empty, infer it from the current task and say so)
+- `purpose`: `$2` (if empty, write one sentence from the current task: what the secret is and why)
+- `task`: what you are building or fixing right now
+- `where_to_find`: where the human can get the value, if you know
 - `requested_by`: your agent name
 - `wait`: 300
 

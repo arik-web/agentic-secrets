@@ -2,6 +2,8 @@
 
 import html
 
+from . import requester
+
 STYLE = """
 :root { color-scheme: light dark; --bg:#f5f5f4; --card:#fff; --ink:#1c1917;
   --muted:#78716c; --line:#e7e5e4; --accent:#0f766e; --accent-ink:#fff;
@@ -49,6 +51,14 @@ button.primary { background:var(--accent); color:var(--accent-ink);
 .opt { font-weight:400; font-size:11px; color:var(--muted); }
 .fhint { margin:6px 0 0; font-size:12px; color:var(--muted); }
 .big { font-size:40px; line-height:1; margin-bottom:12px; }
+.what { margin:0 0 14px; padding:14px 16px; border-radius:10px; background:var(--bg);
+  border:1px solid var(--line); }
+.what .k { font-size:11px; text-transform:uppercase; letter-spacing:.06em; color:var(--muted); }
+.what .name { font-family:ui-monospace,SFMono-Regular,Menlo,monospace; font-size:18px;
+  font-weight:700; margin:2px 0 8px; word-break:break-all; }
+.what .why { font-size:15px; }
+.missing { color:var(--warn); font-style:italic; }
+dd.plain { font-family:inherit; word-break:normal; }
 """
 
 
@@ -93,17 +103,41 @@ def _field_input(index: int, field: dict) -> str:
             f'<span class="as">{stored_as}</span></label>{box}{hint_markup}</div>')
 
 
+def _told(term: str, value: str, missing: str) -> str:
+    """A row that is ALWAYS shown: an unstated answer says so instead of vanishing."""
+    shown = (html.escape(value) if value
+             else f'<span class="missing">{html.escape(missing)}</span>')
+    return f"<dt>{html.escape(term)}</dt><dd class=\"plain\">{shown}</dd>"
+
+
+def _asker(request: dict) -> str:
+    detected = requester.describe(request.get("requester") or {})
+    stated = request.get("requested_by") or ""
+    if stated in ("", "an agent"):
+        return detected
+    if detected and stated not in detected:
+        return f"{stated} - {detected}"
+    return detected or stated
+
+
 def paste_form(request: dict, backend: str) -> str:
     """Return the form a human fills in to hand over one or more secrets.
 
     `backend` is the human-readable store name from `store.backend_label()`,
     passed in rather than imported so this module stays presentational.
     """
+    service = request["name"].split(".", 1)[0]
     rows = "".join([
-        _row("needed for", request["purpose"]),
+        _told("asked by", _asker(request), "could not identify the asking session"),
+        _told("building", request.get("task", ""), "the agent did not say"),
+        _told("where to get it", request.get("where_to_find", ""), "the agent did not say"),
         _row("goes to", request["target"]),
-        _row("asked by", request["requested_by"]),
     ])
+    why = (html.escape(request["purpose"]) if request["purpose"]
+           else '<span class="missing">no purpose given</span>')
+    what = (f'<div class="what"><div class="k">secret &middot; {html.escape(service)}</div>'
+            f'<div class="name">{html.escape(request["name"])}</div>'
+            f'<div class="why">{why}</div></div>')
     inputs = "".join(_field_input(index, field)
                      for index, field in enumerate(request["fields"]))
     count = len(request["fields"])
@@ -114,6 +148,7 @@ def paste_form(request: dict, backend: str) -> str:
       <h1>{heading}</h1>
       <p class="sub">Stored on this machine only. The agent is told that it
       worked &mdash; never what you typed.</p>
+      {what}
       {f'<p class="sub">{intro}</p>' if intro else ""}
       <dl>{rows}</dl>
       <form method="post" action="/paste/{html.escape(request['token'])}"
@@ -156,7 +191,9 @@ def console(requests: list, backend: str, count: int) -> str:
     if requests:
         items = "".join(
             f"<dt>{html.escape(r['name'])}</dt>"
-            f"<dd><a href=\"{html.escape(r['url'])}\">open paste form</a></dd>"
+            f"<dd class=\"plain\">{html.escape(r.get('purpose') or '')} &middot; "
+            f"{html.escape(requester.describe(r.get('requester') or {}) or r.get('requested_by') or '')}"
+            f" &middot; <a href=\"{html.escape(r['url'])}\">open paste form</a></dd>"
             for r in requests)
         body = f"<dl>{items}</dl>"
     else:
